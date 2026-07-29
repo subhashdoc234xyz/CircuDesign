@@ -3,43 +3,76 @@
  * Ported from rahulworld/3d-cad-models-with-bom StepLoader.js → TypeScript.
  *
  * Loads STEP/STP files client-side, extracts mesh geometry and part tree.
+ *
+ * IMPORTANT: We load occt-import-js entirely from CDN at runtime.
+ * Vite's bundler transforms the JS glue code in ways that break the
+ * WASM import contract (causing "function import requires a callable" errors).
+ * Loading from CDN keeps JS+WASM perfectly matched and untransformed.
  */
 
 import type { CADPart, ParsedCADModel } from '../types';
 
-// Load WASM binary from CDN (same approach as App B)
-const WASM_CDN_URL =
+// CDN URLs for both the JS glue code and WASM binary
+const OCCT_CDN_JS =
+  'https://cdn.jsdelivr.net/npm/occt-import-js@0.0.12/dist/occt-import-js.js';
+const OCCT_CDN_WASM =
   'https://cdn.jsdelivr.net/npm/occt-import-js@0.0.12/dist/occt-import-js.wasm';
+
+// Cache the loaded module so we only fetch once
+let occtModulePromise: Promise<any> | null = null;
+
+/**
+ * Load occt-import-js from CDN, bypassing Vite's bundler entirely.
+ * Returns the initialized OCCT instance ready to parse STEP files.
+ */
+async function loadOcctFromCDN(): Promise<any> {
+  if (!occtModulePromise) {
+    occtModulePromise = (async () => {
+      // Fetch the JS glue code as text and evaluate it
+      const response = await fetch(OCCT_CDN_JS);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch occt-import-js from CDN: ${response.status}`);
+      }
+      const jsCode = await response.text();
+
+      // The module sets module.exports = factory function.
+      // We create a minimal CommonJS-like environment to capture it.
+      const moduleShim = { exports: {} as any };
+      const wrappedCode = `(function(module, exports) { ${jsCode} })`;
+
+      // eslint-disable-next-line no-eval
+      const wrapper = (0, eval)(wrappedCode);
+      wrapper(moduleShim, moduleShim.exports);
+
+      // The factory function is now on module.exports
+      const factory = typeof moduleShim.exports === 'function'
+        ? moduleShim.exports
+        : moduleShim.exports.default || moduleShim.exports;
+
+      if (typeof factory !== 'function') {
+        throw new Error('occt-import-js CDN load failed: factory is not a function');
+      }
+
+      // Initialize with WASM from CDN
+      const occt = await factory({
+        locateFile: () => OCCT_CDN_WASM,
+      });
+
+      return occt;
+    })();
+  }
+  return occtModulePromise;
+}
 
 /**
  * Parse a STEP file from an ArrayBuffer.
  * Returns raw mesh data + part tree from occt-import-js.
  */
 export async function parseStepBuffer(buffer: ArrayBuffer): Promise<ParsedCADModel> {
-  // Dynamic import — occt-import-js is a CJS module, so we must handle
-  // multiple possible export shapes depending on Vite's interop:
-  //   mod.default (standard ESM interop)
-  //   mod.default.default (double-wrapped interop)
-  //   mod itself (already the factory function)
-  const mod = await import('occt-import-js');
-  const factory = typeof mod.default === 'function'
-    ? mod.default
-    : typeof (mod.default as any)?.default === 'function'
-      ? (mod.default as any).default
-      : typeof mod === 'function'
-        ? mod
-        : null;
-
-  if (!factory) {
-    throw new Error('Failed to load occt-import-js: could not resolve the factory function. Module keys: ' + Object.keys(mod).join(', '));
-  }
-
-  const occt = await factory({
-    locateFile: (_name: string) => WASM_CDN_URL,
-  });
+  const occt = await loadOcctFromCDN();
 
   const fileBuffer = new Uint8Array(buffer);
-  const result = occt.ReadStepFile(fileBuffer, null);
+  const result = occt.ReadStepFile(fileBuffer);
 
   if (!result || !result.meshes || result.meshes.length === 0) {
     throw new Error('Failed to parse STEP file: no geometry found.');
