@@ -12,15 +12,18 @@ interface ConstraintSatisfactionRingProps {
   states: QuadrantState;
   size?: number;
   interactive?: boolean;
+  pendingApprovals?: number;
 }
 
 export const ConstraintSatisfactionRing: React.FC<ConstraintSatisfactionRingProps> = ({
   states,
   size = 280,
-  interactive = true
+  interactive = true,
+  pendingApprovals = 0
 }) => {
   const satisfiedCount = Object.values(states).filter(Boolean).length;
-  const isAllSatisfied = satisfiedCount === 4;
+  const displaySatisfied = pendingApprovals > 0 ? Math.max(satisfiedCount - 1, 0) : satisfiedCount;
+  const isAllSatisfied = satisfiedCount === 4 && pendingApprovals === 0;
 
   const strokeWidth = 14;
   const radius = (size - strokeWidth * 2) / 2;
@@ -42,10 +45,10 @@ export const ConstraintSatisfactionRing: React.FC<ConstraintSatisfactionRingProp
       key: 'structural',
       label: 'Structural Safety',
       icon: ShieldCheck,
-      active: states.structural,
+      active: states.structural && pendingApprovals === 0,
       color: '#60A5FA', // signal-blue
       offset: quadrantLength,
-      description: 'Yield stress & safety factor > 1.15x'
+      description: pendingApprovals > 0 ? `${pendingApprovals} swap(s) awaiting engineer approval` : 'Yield stress & safety factor > 1.15x'
     },
     {
       key: 'cost',
@@ -112,6 +115,8 @@ export const ConstraintSatisfactionRing: React.FC<ConstraintSatisfactionRingProp
           <div className={`flex h-14 w-14 items-center justify-center rounded-2xl border ${
             isAllSatisfied
               ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-300 glow-emerald'
+              : pendingApprovals > 0
+              ? 'border-amber-400/50 bg-amber-500/20 text-amber-300'
               : 'border-white/20 bg-white/5 text-slate-300'
           } transition-all duration-500`}>
             {isAllSatisfied ? (
@@ -121,7 +126,7 @@ export const ConstraintSatisfactionRing: React.FC<ConstraintSatisfactionRingProp
             )}
           </div>
           <span className="mt-2 font-display text-2xl font-bold tracking-tight text-white">
-            {satisfiedCount}/4
+            {isAllSatisfied ? '4/4' : `${displaySatisfied}/4`}
           </span>
           <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
             Constraints
@@ -129,9 +134,11 @@ export const ConstraintSatisfactionRing: React.FC<ConstraintSatisfactionRingProp
           <span className={`mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
             isAllSatisfied
               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+              : pendingApprovals > 0
+              ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
               : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
           }`}>
-            {isAllSatisfied ? 'Loop Satisfied' : 'Verifying Loop'}
+            {isAllSatisfied ? 'Loop Satisfied' : pendingApprovals > 0 ? `${pendingApprovals} Awaiting Approval` : 'Verifying Loop'}
           </span>
         </div>
       </div>

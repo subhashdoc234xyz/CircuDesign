@@ -244,7 +244,9 @@ export default function App() {
             flaggedSwaps={currentRun.agentOutputs?.orchestrator?.flaggedSwaps || []}
             onApproveAll={handleApproveAllSwaps}
             onRejectAll={handleRejectAllSwaps}
+            onApproveSwap={handleApproveSwap}
             runTitle={activeBom.name}
+            userName={user?.displayName || 'Guest Engineer'}
           />
         )}
 

@@ -191,7 +191,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </h3>
               </div>
               <div className="mt-2 text-[10px] text-slate-400 font-semibold">
-                * CAD Ingestion (STEP/IGES) currently scoped out. CSV/JSON active.
+                CAD file ingestion (STEP/IGES) is on the roadmap — this build accepts structured BOM data (CSV/JSON) directly.
               </div>
             </div>
 

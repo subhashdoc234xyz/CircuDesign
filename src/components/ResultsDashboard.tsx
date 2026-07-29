@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Leaf, RefreshCw, ShieldCheck, DollarSign, Download, Copy, Check, Search, Filter, Sparkles, Layers, ArrowRight, Database, Globe, ChevronDown, ChevronUp, AlertTriangle, Clock } from 'lucide-react';
+import { Leaf, RefreshCw, ShieldCheck, DollarSign, Download, Copy, Check, Search, Filter, Sparkles, Layers, ArrowRight, Database, Globe, ChevronDown, ChevronUp, AlertTriangle, Clock, FileText } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { PipelineRun, BOMItem } from '../types';
 import { ConstraintSatisfactionRing } from './ConstraintSatisfactionRing';
@@ -84,6 +84,99 @@ ${outputs?.orchestrator?.executiveSummary || 'Redesign complete.'}
     downloadAnchor.remove();
   };
 
+  const handleDownloadReport = () => {
+    const flaggedSwaps = outputs?.orchestrator?.flaggedSwaps || [];
+    const approvalNotes = flaggedSwaps.length > 0
+      ? flaggedSwaps.map(s => `  • ${s.partName} (${s.currentMaterial} → ${s.proposedMaterial.name}): ${s.riskReason} — Approved`).join('\n')
+      : '  No swaps required HITL approval.';
+
+    const reportHTML = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>CircuDesign Report — ${run.title}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0B1220; color: #e2e8f0; padding: 40px; }
+  .header { border-bottom: 2px solid #10b981; padding-bottom: 16px; margin-bottom: 24px; }
+  .header h1 { font-size: 24px; color: #6ee7b7; }
+  .header p { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+  .metric { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; text-align: center; }
+  .metric .value { font-size: 28px; font-weight: 700; color: #fff; }
+  .metric .label { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+  .section { margin-bottom: 24px; }
+  .section h2 { font-size: 14px; color: #6ee7b7; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; }
+  .summary { font-size: 13px; line-height: 1.7; color: #cbd5e1; white-space: pre-line; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: rgba(255,255,255,0.05); color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; padding: 8px 12px; text-align: left; font-size: 10px; }
+  td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #e2e8f0; }
+  .eco { color: #6ee7b7; font-weight: 600; }
+  .hitl { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); border-radius: 8px; padding: 12px; font-size: 11px; margin-top: 16px; }
+  .hitl h3 { color: #fbbf24; font-size: 12px; margin-bottom: 8px; }
+  .sdg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .sdg-item { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); border-radius: 8px; padding: 10px; font-size: 11px; }
+  .sdg-item strong { color: #6ee7b7; }
+  .footer { margin-top: 32px; text-align: center; font-size: 10px; color: #64748b; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 16px; }
+  @media print { body { background: #fff; color: #1e293b; } .metric { border-color: #e2e8f0; } th { background: #f1f5f9; color: #475569; } td { color: #334155; } .eco { color: #059669; } .header h1 { color: #059669; } .section h2 { color: #059669; } }
+</style></head><body>
+  <div class="header">
+    <h1>♻ CircuDesign — Optimization Report</h1>
+    <p>Product: ${run.title} | Run ID: ${run.id} | Date: ${new Date(run.timestamp).toLocaleString()}</p>
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><div class="value">-${run.carbonSavedPercent}%</div><div class="label">CO₂e Reduction (${run.carbonSavedKg} kg)</div></div>
+    <div class="metric"><div class="value">${run.recyclabilityScore}%</div><div class="label">Recyclability Score</div></div>
+    <div class="metric"><div class="value">${run.disassemblyScore}/100</div><div class="label">Disassembly Ease</div></div>
+    <div class="metric"><div class="value">+${outputs?.materialScience?.totalBioBasedIncreasePercent || 0}%</div><div class="label">Bio-Based Content</div></div>
+    <div class="metric"><div class="value">${run.costChangePercent !== undefined ? (run.costChangePercent >= 0 ? '+' : '') + run.costChangePercent + '%' : 'N/A'}</div><div class="label">Cost Balance</div></div>
+    <div class="metric"><div class="value">${run.latencySec || 0}s</div><div class="label">Generation Latency</div></div>
+  </div>
+
+  <div class="section">
+    <h2>Orchestrator Agent Synthesis</h2>
+    <div class="summary">${outputs?.orchestrator?.executiveSummary || 'Optimization complete.'}</div>
+  </div>
+
+  <div class="section">
+    <h2>BOM Substitution Table</h2>
+    <table>
+      <thead><tr><th>Part</th><th>Original Material</th><th>Sustainable Alternative</th><th>Tensile (MPa)</th><th>Carbon Δ</th><th>Cost Δ</th></tr></thead>
+      <tbody>
+        ${bomItems.map(item => {
+          const s = proposedSwaps[item.partId];
+          const carbonDelta = s ? Math.round(((item.carbonFootprintKgCO2PerKg - s.carbonFootprintKgCO2PerKg) / item.carbonFootprintKgCO2PerKg) * 100) : 0;
+          const costDelta = s ? Math.round((s.costMultiplier - 1) * 100) : 0;
+          return '<tr><td>' + item.name + '</td><td>' + item.currentMaterial + '</td><td class="eco">' + (s ? s.name : 'N/A') + '</td><td>' + item.tensileStrengthMPa + ' → ' + (s ? s.tensileStrengthMPa : item.tensileStrengthMPa) + '</td><td class="eco">-' + carbonDelta + '%</td><td>' + (costDelta >= 0 ? '+' : '') + costDelta + '%</td></tr>';
+        }).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="hitl">
+    <h3>⚠ HITL Engineering Approval Log</h3>
+    <pre>${approvalNotes}</pre>
+  </div>
+
+  <div class="section">
+    <h2>UN SDG Alignment</h2>
+    <div class="sdg">
+      <div class="sdg-item"><strong>SDG 12:</strong> Responsible Consumption & Production — Target 12.5</div>
+      <div class="sdg-item"><strong>SDG 9:</strong> Industry, Innovation & Infrastructure — Target 9.4</div>
+    </div>
+  </div>
+
+  <div class="footer">Generated by CircuDesign Multi-Agent AI Platform</div>
+</body></html>`;
+
+    const blob = new Blob([reportHTML], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const printWindow = window.open(url, '_blank');
+    if (printWindow) {
+      printWindow.onload = () => {
+        setTimeout(() => printWindow.print(), 500);
+      };
+    }
+  };
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Top Header & Quick Actions */}
@@ -102,7 +195,7 @@ ${outputs?.orchestrator?.executiveSummary || 'Redesign complete.'}
           </h2>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleCopyReport}
             className="glass-button flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold text-slate-200 hover:text-white"
@@ -120,6 +213,14 @@ ${outputs?.orchestrator?.executiveSummary || 'Redesign complete.'}
           </button>
 
           <button
+            onClick={handleDownloadReport}
+            className="glass-button flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold text-slate-200 hover:text-white border border-emerald-500/30"
+          >
+            <FileText className="h-4 w-4 text-emerald-400" />
+            <span>Download Report</span>
+          </button>
+
+          <button
             onClick={onRunNewPipeline}
             className="flex items-center gap-2 rounded-xl border border-emerald-500/50 bg-emerald-500/20 px-4 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/30 glow-emerald"
           >
@@ -133,7 +234,10 @@ ${outputs?.orchestrator?.executiveSummary || 'Redesign complete.'}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Signature Constraint Satisfaction Ring HUD */}
         <div className="lg:col-span-5 flex flex-col justify-center">
-          <ConstraintSatisfactionRing states={constraintStates} />
+          <ConstraintSatisfactionRing
+            states={constraintStates}
+            pendingApprovals={outputs?.orchestrator?.flaggedSwaps?.filter(s => !s.userApproved).length || 0}
+          />
         </div>
 
         {/* Executive Summary & 4 Key Metric Cards */}
@@ -184,6 +288,7 @@ ${outputs?.orchestrator?.executiveSummary || 'Redesign complete.'}
                 {run.latencySec ? `${run.latencySec}s` : '1.8s'}
               </span>
               <span className="text-[10px] text-slate-400 font-medium">Latency</span>
+              <span className="text-[8px] text-slate-500 block mt-0.5">agent time, excl. approval</span>
             </div>
           </div>
         </div>
