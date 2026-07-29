@@ -1,7 +1,12 @@
-import express from 'express';
+import dotenv from 'dotenv';
 import path from 'path';
+import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import { apiRouter } from './src/server/routes/api';
+
+// Load environment variables from .env.local, then fall back to .env
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 async function startServer() {
   const app = express();
