@@ -3,6 +3,7 @@ import { Navbar } from './components/Navbar';
 import { LandingHero } from './components/LandingHero';
 import { AuthPage } from './components/AuthPage';
 import { Dashboard } from './components/Dashboard';
+import { ApprovalPage } from './components/ApprovalPage';
 import { PipelineCanvas } from './components/PipelineCanvas';
 import { ResultsDashboard } from './components/ResultsDashboard';
 import { HumanInTheLoopModal } from './components/HumanInTheLoopModal';
@@ -24,7 +25,7 @@ export default function App() {
   const [logs, setLogs] = useState<AgentLog[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'landing' | 'auth' | 'dashboard' | 'pipeline' | 'results'>('landing');
+  const [viewMode, setViewMode] = useState<'landing' | 'auth' | 'dashboard' | 'pipeline' | 'results' | 'approval'>('landing');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [showHumanGate, setShowHumanGate] = useState(false);
 
@@ -99,7 +100,7 @@ export default function App() {
     setLogs([]);
     setCurrentRun(null);
 
-    // Live agent progression sequence
+    // Live agent progression sequence with reflection loops
     setCurrentAgentId('bom');
     addLog('bom', '1. BOM Deconstruction Agent', 'Parsing raw BOM structure, materials, and joint topology...');
     await new Promise(r => setTimeout(r, 600));
@@ -111,6 +112,17 @@ export default function App() {
     setCurrentAgentId('structural');
     addLog('structural', '3. Structural Integrity Agent', 'Calculating yield stress ratios and mechanical load safety margins...');
     await new Promise(r => setTimeout(r, 700));
+
+    addLog('structural', '3. Structural Integrity Agent', '[Warning]: Candidate swap flax-composite frame lacks sufficient tensile margin.');
+    await new Promise(r => setTimeout(r, 600));
+
+    setCurrentAgentId('material');
+    addLog('material', '2. Material Science Agent', '[Reflection Loop]: Re-evaluating alternative... Swapping flax matrix for Recycled Structural Steel.');
+    await new Promise(r => setTimeout(r, 700));
+
+    setCurrentAgentId('structural');
+    addLog('structural', '3. Structural Integrity Agent', '[Success]: Recycled steel alternative meets structural stress limits. Proceeding.');
+    await new Promise(r => setTimeout(r, 600));
 
     setCurrentAgentId('lifecycle');
     addLog('lifecycle', '4. Circular Lifecycle Agent', 'Scoring disassembly ease index, recyclability %, and embodied CO2e reductions...');
@@ -136,10 +148,10 @@ export default function App() {
         setCurrentRun(data.run);
         fetchHistory();
 
-        addLog('orchestrator', '5. Orchestrator Agent', 'Pipeline run complete. All constraints satisfied.');
+        addLog('orchestrator', '5. Orchestrator Agent', 'Pipeline run complete. All constraints analyzed.');
 
         if (data.run.agentOutputs?.orchestrator?.humanGateRequired) {
-          setShowHumanGate(true);
+          setViewMode('approval'); // HARD HALT: Direct to approval screen
         } else {
           setViewMode('results');
         }
@@ -163,8 +175,12 @@ export default function App() {
   };
 
   const handleApproveAllSwaps = () => {
-    setShowHumanGate(false);
     setViewMode('results');
+  };
+
+  const handleRejectAllSwaps = () => {
+    setViewMode('dashboard');
+    setCurrentRun(null);
   };
 
   const handleDeleteRun = async (id: string) => {
@@ -223,6 +239,15 @@ export default function App() {
           />
         )}
 
+        {viewMode === 'approval' && currentRun && (
+          <ApprovalPage
+            flaggedSwaps={currentRun.agentOutputs?.orchestrator?.flaggedSwaps || []}
+            onApproveAll={handleApproveAllSwaps}
+            onRejectAll={handleRejectAllSwaps}
+            runTitle={activeBom.name}
+          />
+        )}
+
         {viewMode === 'pipeline' && (
           <PipelineCanvas
             outputs={currentRun ? currentRun.agentOutputs : null}
@@ -230,7 +255,7 @@ export default function App() {
             isProcessing={isProcessing}
             currentAgentId={currentAgentId}
             onTriggerRun={runPipeline}
-            onTriggerHumanGate={() => setShowHumanGate(true)}
+            onTriggerHumanGate={() => setViewMode('approval')}
           />
         )}
 

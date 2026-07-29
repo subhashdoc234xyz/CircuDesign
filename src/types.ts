@@ -123,6 +123,8 @@ export interface PipelineRun {
   recyclabilityScore: number;
   disassemblyScore: number;
   userUid: string;
+  latencySec?: number;
+  costChangePercent?: number;
 }
 
 export interface UserAuth {

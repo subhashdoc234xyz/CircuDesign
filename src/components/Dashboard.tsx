@@ -183,11 +183,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Upload Card */}
         <div className="glass-panel rounded-3xl p-6 border border-white/10 flex flex-col justify-between space-y-4">
           <div className="space-y-3 flex-1 flex flex-col justify-between">
-            <div className="flex items-center gap-2">
-              <Upload className="h-5 w-5 text-emerald-400" />
-              <h3 className="font-display text-sm font-bold text-white">
-                Upload Custom BOM
-              </h3>
+            <div>
+              <div className="flex items-center gap-2">
+                <Upload className="h-5 w-5 text-emerald-400" />
+                <h3 className="font-display text-sm font-bold text-white">
+                  Upload Custom BOM
+                </h3>
+              </div>
+              <div className="mt-2 text-[10px] text-slate-400 font-semibold">
+                * CAD Ingestion (STEP/IGES) currently scoped out. CSV/JSON active.
+              </div>
             </div>
 
             <div

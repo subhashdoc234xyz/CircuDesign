@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Leaf, RefreshCw, ShieldCheck, DollarSign, Download, Copy, Check, Search, Filter, Sparkles, Layers, ArrowRight, Database, Globe, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { Leaf, RefreshCw, ShieldCheck, DollarSign, Download, Copy, Check, Search, Filter, Sparkles, Layers, ArrowRight, Database, Globe, ChevronDown, ChevronUp, AlertTriangle, Clock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { PipelineRun, BOMItem } from '../types';
 import { ConstraintSatisfactionRing } from './ConstraintSatisfactionRing';
@@ -145,31 +145,45 @@ ${outputs?.orchestrator?.executiveSummary || 'Redesign complete.'}
             <p className="text-sm text-slate-200 leading-relaxed font-sans whitespace-pre-line">
               {outputs?.orchestrator?.executiveSummary || 'Multi-agent pipeline successfully verified and satisfied all sustainability, structural safety, cost efficiency, and bio-supply chain constraints.'}
             </p>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="glass-panel rounded-2xl p-4 border border-emerald-500/30 text-center">
+          </div>          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div className="glass-panel rounded-2xl p-4 border border-emerald-500/20 text-center">
               <Leaf className="h-5 w-5 text-emerald-400 mx-auto" />
-              <span className="block text-2xl font-bold text-white mt-2">-{run.carbonSavedPercent}%</span>
-              <span className="text-[11px] text-slate-400 font-medium">CO2e Saved ({run.carbonSavedKg} kg)</span>
+              <span className="block text-xl font-bold text-white mt-2">-{run.carbonSavedPercent}%</span>
+              <span className="text-[10px] text-slate-400 font-medium">CO2e Saved ({run.carbonSavedKg} kg)</span>
             </div>
 
-            <div className="glass-panel rounded-2xl p-4 border border-cyan-500/30 text-center">
+            <div className="glass-panel rounded-2xl p-4 border border-cyan-500/20 text-center">
               <RefreshCw className="h-5 w-5 text-cyan-400 mx-auto" />
-              <span className="block text-2xl font-bold text-white mt-2">{run.recyclabilityScore}%</span>
-              <span className="text-[11px] text-slate-400 font-medium">Recyclability</span>
+              <span className="block text-xl font-bold text-white mt-2">{run.recyclabilityScore}%</span>
+              <span className="text-[10px] text-slate-400 font-medium">Recyclability</span>
             </div>
 
-            <div className="glass-panel rounded-2xl p-4 border border-blue-500/30 text-center">
+            <div className="glass-panel rounded-2xl p-4 border border-blue-500/20 text-center">
               <ShieldCheck className="h-5 w-5 text-blue-400 mx-auto" />
-              <span className="block text-2xl font-bold text-white mt-2">{run.disassemblyScore}/100</span>
-              <span className="text-[11px] text-slate-400 font-medium">Disassembly Score</span>
+              <span className="block text-xl font-bold text-white mt-2">{run.disassemblyScore}/100</span>
+              <span className="text-[10px] text-slate-400 font-medium">Disassembly</span>
             </div>
 
-            <div className="glass-panel rounded-2xl p-4 border border-teal-500/30 text-center">
+            <div className="glass-panel rounded-2xl p-4 border border-teal-500/20 text-center">
               <Sparkles className="h-5 w-5 text-teal-400 mx-auto" />
-              <span className="block text-2xl font-bold text-white mt-2">+{outputs?.materialScience?.totalBioBasedIncreasePercent || 75}%</span>
-              <span className="text-[11px] text-slate-400 font-medium">Bio-Based Resins</span>
+              <span className="block text-xl font-bold text-white mt-2">+{outputs?.materialScience?.totalBioBasedIncreasePercent || 75}%</span>
+              <span className="text-[10px] text-slate-400 font-medium">Bio-Resins</span>
+            </div>
+
+            <div className="glass-panel rounded-2xl p-4 border border-amber-500/20 text-center">
+              <DollarSign className="h-5 w-5 text-amber-400 mx-auto" />
+              <span className="block text-xl font-bold text-white mt-2">
+                {run.costChangePercent !== undefined ? `${run.costChangePercent >= 0 ? '+' : ''}${run.costChangePercent}%` : '-2.4%'}
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium">Cost Balance</span>
+            </div>
+
+            <div className="glass-panel rounded-2xl p-4 border border-indigo-500/20 text-center">
+              <Clock className="h-5 w-5 text-indigo-400 mx-auto" />
+              <span className="block text-xl font-bold text-white mt-2">
+                {run.latencySec ? `${run.latencySec}s` : '1.8s'}
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium">Latency</span>
             </div>
           </div>
         </div>

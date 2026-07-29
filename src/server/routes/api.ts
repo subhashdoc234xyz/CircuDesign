@@ -193,6 +193,7 @@ if (process.env.GEMINI_API_KEY) {
 
 // POST /api/agent/run - Executes full multi-agent optimization pipeline
 apiRouter.post('/agent/run', async (req: Request, res: Response) => {
+  const startTime = Date.now();
   try {
     const { items, bomName, userUid } = req.body;
     const bomItems = items && Array.isArray(items) && items.length > 0 ? items : SAMPLE_BOMS[0].items;
@@ -228,6 +229,22 @@ apiRouter.post('/agent/run', async (req: Request, res: Response) => {
       orchestrator
     };
 
+    // Calculate cost change percentage
+    let totalBaselineCost = 0;
+    let totalOptimizedCost = 0;
+    for (const item of bomItems) {
+      const swap = materialScience.proposedSwaps[item.partId];
+      const baselineItemCost = item.unitCostUSD * item.quantity;
+      const optimizedItemCost = baselineItemCost * (swap ? swap.costMultiplier : 1.0);
+      totalBaselineCost += baselineItemCost;
+      totalOptimizedCost += optimizedItemCost;
+    }
+    const costChangePercent = totalBaselineCost > 0
+      ? Math.round(((totalOptimizedCost - totalBaselineCost) / totalBaselineCost) * 1000) / 10
+      : 0;
+
+    const latencySec = parseFloat(((Date.now() - startTime) / 1000).toFixed(1));
+
     const runRecord: PipelineRun = {
       id: `run-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       timestamp: new Date().toISOString(),
@@ -240,7 +257,9 @@ apiRouter.post('/agent/run', async (req: Request, res: Response) => {
       carbonSavedPercent: circularLifecycle.carbonSavingsPercent,
       recyclabilityScore: circularLifecycle.recyclabilityPercent,
       disassemblyScore: circularLifecycle.disassemblyScore,
-      userUid: uid
+      userUid: uid,
+      latencySec,
+      costChangePercent
     };
 
     // Save to user session store
