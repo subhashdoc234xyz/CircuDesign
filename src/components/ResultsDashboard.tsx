@@ -1,21 +1,72 @@
-import React, { useState } from 'react';
-import { Leaf, RefreshCw, ShieldCheck, DollarSign, Download, Copy, Check, Search, Filter, Sparkles, Layers, ArrowRight, Database, Globe, ChevronDown, ChevronUp, AlertTriangle, Clock, FileText } from 'lucide-react';
+import React, { useState, useCallback, Suspense } from 'react';
+import { Leaf, RefreshCw, ShieldCheck, DollarSign, Download, Copy, Check, Search, Filter, Sparkles, Layers, ArrowRight, Database, Globe, ChevronDown, ChevronUp, AlertTriangle, Clock, FileText, Box } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
-import { PipelineRun, BOMItem } from '../types';
+import { PipelineRun, BOMItem, ParsedCADModel } from '../types';
 import { ConstraintSatisfactionRing } from './ConstraintSatisfactionRing';
+import { CADViewer } from './cad/CADViewer';
+import { CADPartsList } from './cad/CADPartsList';
 
 interface ResultsDashboardProps {
   run: PipelineRun;
   onRunNewPipeline: () => void;
+  cadModel?: ParsedCADModel | null;
 }
 
 export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   run,
-  onRunNewPipeline
+  onRunNewPipeline,
+  cadModel
 }) => {
   const [copied, setCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedPartId, setExpandedPartId] = useState<string | null>(null);
+
+  // CAD viewer state
+  const [highlightedMeshIndex, setHighlightedMeshIndex] = useState(-1);
+  const [uncheckedMeshes, setUncheckedMeshes] = useState<number[]>([]);
+
+  const handleMeshClick = useCallback((meshIndex: number) => {
+    setHighlightedMeshIndex(prev => prev === meshIndex ? -1 : meshIndex);
+    // Find the BOM item corresponding to this mesh and expand it
+    if (cadModel) {
+      const part = cadModel.parts.find(p => p.meshIndices.includes(meshIndex));
+      if (part) {
+        const bomItem = bomItems.find(item => item.name === part.name || item.partId === `CAD-${(cadModel.parts.indexOf(part) + 1).toString().padStart(2, '0')}`);
+        if (bomItem) setExpandedPartId(bomItem.partId);
+      }
+    }
+  }, [cadModel]);
+
+  const handleToggleMesh = useCallback((meshIndex: number) => {
+    setUncheckedMeshes(prev =>
+      prev.includes(meshIndex)
+        ? prev.filter(i => i !== meshIndex)
+        : [...prev, meshIndex]
+    );
+  }, []);
+
+  const handleResetCADView = useCallback(() => {
+    setHighlightedMeshIndex(-1);
+    setUncheckedMeshes([]);
+  }, []);
+
+  // When a BOM table row is clicked, highlight the corresponding mesh in the 3D viewer
+  const handleBomRowClick = useCallback((partId: string) => {
+    if (!cadModel) {
+      setExpandedPartId(prev => prev === partId ? null : partId);
+      return;
+    }
+    // Find the CAD part index from the partId (e.g. "CAD-01" -> index 0)
+    const match = partId.match(/CAD-(\d+)/);
+    if (match) {
+      const partIndex = parseInt(match[1], 10) - 1;
+      if (partIndex >= 0 && partIndex < cadModel.parts.length) {
+        const meshIdx = cadModel.parts[partIndex].meshIndices[0];
+        setHighlightedMeshIndex(prev => prev === meshIdx ? -1 : meshIdx);
+      }
+    }
+    setExpandedPartId(prev => prev === partId ? null : partId);
+  }, [cadModel]);
 
   const outputs = run.agentOutputs;
   const bomItems = run.bomData || [];
@@ -294,6 +345,52 @@ ${outputs?.orchestrator?.executiveSummary || 'Redesign complete.'}
         </div>
       </div>
 
+      {/* 3D CAD Viewer Panel — only shown when CAD model was uploaded */}
+      {cadModel && (
+        <div className="glass-panel rounded-3xl border border-white/10 overflow-hidden">
+          <div className="flex items-center gap-2 px-6 py-3 border-b border-white/10 bg-white/[0.02]">
+            <Box className="h-4 w-4 text-cyan-400" />
+            <h3 className="font-display text-sm font-bold text-white">
+              3D CAD Model — Interactive Viewer
+            </h3>
+            <span className="text-[10px] text-slate-500 ml-2">
+              Click parts to highlight • Scroll to zoom • Drag to rotate
+            </span>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-4" style={{ height: '420px' }}>
+            {/* 3D Viewer */}
+            <div className="lg:col-span-3 h-full">
+              <Suspense fallback={
+                <div className="flex items-center justify-center h-full bg-[#080E1A]">
+                  <RefreshCw className="h-6 w-6 text-cyan-400 animate-spin" />
+                  <span className="ml-2 text-xs text-slate-400">Loading 3D viewer...</span>
+                </div>
+              }>
+                <CADViewer
+                  model={cadModel}
+                  highlightedMeshIndex={highlightedMeshIndex}
+                  onMeshClick={handleMeshClick}
+                  onMeshHover={setHighlightedMeshIndex}
+                  uncheckedMeshes={uncheckedMeshes}
+                />
+              </Suspense>
+            </div>
+            {/* Parts sidebar */}
+            <div className="lg:col-span-1 h-full border-l border-white/10 bg-black/20 overflow-hidden">
+              <CADPartsList
+                model={cadModel}
+                highlightedMeshIndex={highlightedMeshIndex}
+                onPartHover={setHighlightedMeshIndex}
+                onPartClick={handleMeshClick}
+                uncheckedMeshes={uncheckedMeshes}
+                onToggleMesh={handleToggleMesh}
+                onResetView={handleResetCADView}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Visual Analytics Charts: Recharts Bar & Radar */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-4">
@@ -392,7 +489,7 @@ ${outputs?.orchestrator?.executiveSummary || 'Redesign complete.'}
                 return (
                   <React.Fragment key={item.partId}>
                     <tr
-                      onClick={() => setExpandedPartId(isExpanded ? null : item.partId)}
+                      onClick={() => handleBomRowClick(item.partId)}
                       className="hover:bg-white/5 transition cursor-pointer select-none"
                     >
                       <td className="p-3 font-medium text-white flex items-center gap-2">

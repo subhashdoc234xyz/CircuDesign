@@ -6,7 +6,7 @@ import { runStructuralIntegrityAgent } from '../agents/structuralAgent';
 import { runCircularLifecycleAgent } from '../agents/lifecycleAgent';
 import { runOrchestratorAgent } from '../agents/orchestratorAgent';
 import { SAMPLE_BOMS } from '../../data/sampleBoms';
-import { PipelineRun } from '../../types';
+import { PipelineRun, BOMItem } from '../../types';
 
 export const apiRouter = Router();
 
@@ -28,33 +28,49 @@ function inferBOMItem(part: { part_name: string; material: string; quantity?: nu
   let recyclablePercent = 30;
   let disassemblyTimeSec = 20;
 
-  const lowerMat = material.toLowerCase();
   const lowerName = name.toLowerCase();
+  const lowerMat = material.toLowerCase();
 
-  if (lowerMat.includes('steel') || lowerMat.includes('iron') || lowerMat.includes('metal')) {
+  if (lowerName.includes('frame') || lowerName.includes('bracket') || lowerName.includes('chassis') || lowerName.includes('arm') || lowerName.includes('stand')) {
     category = 'Structural Frame';
-    tensileStrengthMPa = 250;
-    carbonFootprintKgCO2PerKg = 8.2;
+    tensileStrengthMPa = 180;
+    carbonFootprintKgCO2PerKg = 4.2;
     joineryType = 'Threaded Fasteners';
-    maxOperatingTempC = 400;
-    recyclablePercent = 90;
-    disassemblyTimeSec = 25;
-  } else if (lowerMat.includes('aluminum') || lowerMat.includes('aluminium') || lowerMat.includes('copper')) {
+    maxOperatingTempC = 150;
+    recyclablePercent = 70;
+    disassemblyTimeSec = 35;
+  } else if (lowerName.includes('sink') || lowerName.includes('thermal') || lowerName.includes('radiator')) {
     category = 'Thermal/Heat Sink';
-    tensileStrengthMPa = 90;
-    carbonFootprintKgCO2PerKg = 12.5;
+    tensileStrengthMPa = 110;
+    carbonFootprintKgCO2PerKg = 8.5;
     joineryType = 'Threaded Fasteners';
     maxOperatingTempC = 200;
-    recyclablePercent = 98;
-    disassemblyTimeSec = 20;
-  } else if (lowerMat.includes('rubber') || lowerMat.includes('silicone') || lowerMat.includes('elastomer') || lowerMat.includes('pvc')) {
+    recyclablePercent = 90;
+    disassemblyTimeSec = 15;
+  } else if (lowerName.includes('pcb') || lowerName.includes('board') || lowerName.includes('circuit') || lowerName.includes('chip') || lowerName.includes('sensor')) {
+    category = 'Electronics/PCB';
+    tensileStrengthMPa = 250;
+    carbonFootprintKgCO2PerKg = 15.0;
+    joineryType = 'Threaded Fasteners';
+    maxOperatingTempC = 105;
+    recyclablePercent = 20;
+    disassemblyTimeSec = 60;
+  } else if (lowerName.includes('screw') || lowerName.includes('bolt') || lowerName.includes('nut') || lowerName.includes('pin') || lowerName.includes('clip')) {
+    category = 'Fasteners/Hardware';
+    tensileStrengthMPa = 400;
+    carbonFootprintKgCO2PerKg = 2.1;
+    joineryType = 'Threaded Fasteners';
+    maxOperatingTempC = 300;
+    recyclablePercent = 95;
+    disassemblyTimeSec = 10;
+  } else if (lowerName.includes('seal') || lowerName.includes('gasket') || lowerName.includes('rubber') || lowerMat.includes('silicone') || lowerMat.includes('rubber')) {
     category = 'Flexible/Seals';
     tensileStrengthMPa = 15;
-    carbonFootprintKgCO2PerKg = 4.2;
+    carbonFootprintKgCO2PerKg = 3.1;
     joineryType = 'Press-fit';
-    maxOperatingTempC = 75;
+    maxOperatingTempC = 180;
     recyclablePercent = 10;
-    disassemblyTimeSec = 15;
+    disassemblyTimeSec = 5;
   } else if (lowerMat.includes('glass') || lowerMat.includes('lens') || lowerMat.includes('polycarbonate') || lowerMat.includes('pc') || lowerMat.includes('acrylic')) {
     category = 'Housing/Enclosure';
     tensileStrengthMPa = 62;

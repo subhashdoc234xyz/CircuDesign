@@ -9,11 +9,15 @@ import { ResultsDashboard } from './components/ResultsDashboard';
 import { HumanInTheLoopModal } from './components/HumanInTheLoopModal';
 import { HistoryDrawer } from './components/HistoryDrawer';
 import { SdgImpactFooter } from './components/SdgImpactFooter';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { db } from './lib/firebase';
 import { SAMPLE_BOMS } from './data/sampleBoms';
-import { PipelineRun, AgentLog, UserAuth, BOMItem, FlaggedSwap } from './types';
+import { PipelineRun, AgentLog, BOMItem, ParsedCADModel } from './types';
 
-export default function App() {
-  const [user, setUser] = useState<UserAuth | null>(null);
+function MainApp() {
+  const { currentUser, logout } = useAuth();
 
   const [activeBom, setActiveBom] = useState<{ name: string; items: BOMItem[] }>({
     name: SAMPLE_BOMS[0].name,
@@ -28,45 +32,40 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'landing' | 'auth' | 'dashboard' | 'pipeline' | 'results' | 'approval'>('landing');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [showHumanGate, setShowHumanGate] = useState(false);
+  const [cadModel, setCadModel] = useState<ParsedCADModel | null>(null);
 
-  // Load user history on mount
+  // Auto-switch to dashboard on auth change if on auth page
+  useEffect(() => {
+    if (currentUser && viewMode === 'auth') {
+      setViewMode('dashboard');
+    }
+  }, [currentUser]);
+
+  // Load user history from Firestore (or fallback to backend API) on auth change
   useEffect(() => {
     fetchHistory();
-  }, [user]);
+  }, [currentUser]);
 
   const fetchHistory = async () => {
     try {
-      const uid = user ? user.uid : 'guest-session';
-      const res = await fetch(`/api/runs?userUid=${uid}`);
-      const data = await res.json();
-      if (data && data.runs) {
-        setRuns(data.runs);
+      if (currentUser && !currentUser.isAnonymous) {
+        // Query user's private Firestore subcollection: users/{uid}/runs
+        const runsRef = collection(db, 'users', currentUser.uid, 'runs');
+        const q = query(runsRef, orderBy('timestamp', 'desc'));
+        const snapshot = await getDocs(q);
+        const userRuns: PipelineRun[] = snapshot.docs.map(doc => doc.data() as PipelineRun);
+        setRuns(userRuns);
+      } else {
+        const uid = currentUser ? currentUser.uid : 'guest-session';
+        const res = await fetch(`/api/runs?userUid=${uid}`);
+        const data = await res.json();
+        if (data && data.runs) {
+          setRuns(data.runs);
+        }
       }
     } catch (err) {
-      console.warn('Could not fetch run history:', err);
+      console.warn('Could not fetch run history from Firestore/API:', err);
     }
-  };
-
-  const handleContinueGoogle = () => {
-    setUser({
-      uid: `google-user-${Date.now()}`,
-      email: 'engineer@circudesign.ai',
-      displayName: 'Alex Rivers (Lead Engineer)',
-      photoURL: null,
-      isGuest: false
-    });
-    setViewMode('dashboard');
-  };
-
-  const handleContinueGuest = () => {
-    setUser({
-      uid: `guest-session-${Date.now()}`,
-      email: null,
-      displayName: 'Guest Engineer',
-      photoURL: null,
-      isGuest: true
-    });
-    setViewMode('dashboard');
   };
 
   const handleSelectSampleBOM = (bom: typeof SAMPLE_BOMS[0]) => {
@@ -77,6 +76,10 @@ export default function App() {
   const handleCustomFileUpload = (items: BOMItem[], fileName: string) => {
     setActiveBom({ name: fileName, items });
     setViewMode('pipeline');
+  };
+
+  const handleCADModelLoaded = (model: ParsedCADModel) => {
+    setCadModel(model);
   };
 
   const addLog = (agentId: 'bom' | 'material' | 'structural' | 'lifecycle' | 'orchestrator', agentName: string, message: string, details?: string) => {
@@ -139,13 +142,24 @@ export default function App() {
         body: JSON.stringify({
           items: activeBom.items,
           bomName: activeBom.name,
-          userUid: user?.uid || 'guest-session'
+          userUid: currentUser?.uid || 'guest-session'
         })
       });
 
       const data = await response.json();
       if (data && data.success && data.run) {
-        setCurrentRun(data.run);
+        const runRecord: PipelineRun = data.run;
+        setCurrentRun(runRecord);
+
+        // Save run directly to user's private Firestore subcollection: users/{uid}/runs/{runId}
+        if (currentUser && !currentUser.isAnonymous) {
+          try {
+            await setDoc(doc(db, 'users', currentUser.uid, 'runs', runRecord.id), runRecord);
+          } catch (fsErr) {
+            console.warn('Could not persist run to Firestore:', fsErr);
+          }
+        }
+
         fetchHistory();
 
         addLog('orchestrator', '5. Orchestrator Agent', 'Pipeline run complete. All constraints analyzed.');
@@ -185,35 +199,32 @@ export default function App() {
 
   const handleDeleteRun = async (id: string) => {
     try {
-      const uid = user ? user.uid : 'guest-session';
-      await fetch(`/api/runs/${id}?userUid=${uid}`, { method: 'DELETE' });
+      if (currentUser && !currentUser.isAnonymous) {
+        await deleteDoc(doc(db, 'users', currentUser.uid, 'runs', id));
+      } else {
+        const uid = currentUser ? currentUser.uid : 'guest-session';
+        await fetch(`/api/runs/${id}?userUid=${uid}`, { method: 'DELETE' });
+      }
       fetchHistory();
     } catch (err) {
       console.warn('Could not delete run:', err);
     }
   };
 
-  const handleSignOut = () => {
-    setUser(null);
-    setViewMode('landing');
-    setCurrentRun(null);
-  };
-
   return (
     <div className="min-h-screen flex flex-col justify-between bg-[#0B1220] text-slate-100">
       {/* Top Navbar */}
       <Navbar
-        user={user}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onReset={() => {
-          if (user) {
+          if (currentUser) {
             setViewMode('dashboard');
           } else {
             setViewMode('landing');
           }
           setCurrentRun(null);
+          setCadModel(null);
         }}
-        onSignOut={handleSignOut}
         activeRunTitle={activeBom.name}
         isProcessing={isProcessing}
       />
@@ -221,54 +232,63 @@ export default function App() {
       {/* Main Content Area */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 w-full flex-1">
         {viewMode === 'landing' && (
-          <LandingHero onGetStarted={() => setViewMode('auth')} />
+          <LandingHero onGetStarted={() => setViewMode(currentUser ? 'dashboard' : 'auth')} />
         )}
 
         {viewMode === 'auth' && (
           <AuthPage
-            onContinueGoogle={handleContinueGoogle}
-            onContinueGuest={handleContinueGuest}
+            onSuccess={() => setViewMode('dashboard')}
             onBackToLanding={() => setViewMode('landing')}
           />
         )}
 
         {viewMode === 'dashboard' && (
-          <Dashboard
-            onSelectSampleBOM={handleSelectSampleBOM}
-            onCustomFileUpload={handleCustomFileUpload}
-          />
+          <ProtectedRoute fallback={<AuthPage onSuccess={() => setViewMode('dashboard')} onBackToLanding={() => setViewMode('landing')} />}>
+            <Dashboard
+              onSelectSampleBOM={handleSelectSampleBOM}
+              onCustomFileUpload={handleCustomFileUpload}
+              onCADModelLoaded={handleCADModelLoaded}
+            />
+          </ProtectedRoute>
         )}
 
         {viewMode === 'approval' && currentRun && (
-          <ApprovalPage
-            flaggedSwaps={currentRun.agentOutputs?.orchestrator?.flaggedSwaps || []}
-            onApproveAll={handleApproveAllSwaps}
-            onRejectAll={handleRejectAllSwaps}
-            onApproveSwap={handleApproveSwap}
-            runTitle={activeBom.name}
-            userName={user?.displayName || 'Guest Engineer'}
-          />
+          <ProtectedRoute fallback={<AuthPage onSuccess={() => setViewMode('dashboard')} onBackToLanding={() => setViewMode('landing')} />}>
+            <ApprovalPage
+              flaggedSwaps={currentRun.agentOutputs?.orchestrator?.flaggedSwaps || []}
+              onApproveAll={handleApproveAllSwaps}
+              onRejectAll={handleRejectAllSwaps}
+              onApproveSwap={handleApproveSwap}
+              runTitle={activeBom.name}
+              userName={currentUser?.displayName || (currentUser?.isAnonymous ? 'Guest Engineer' : 'Lead Engineer')}
+            />
+          </ProtectedRoute>
         )}
 
         {viewMode === 'pipeline' && (
-          <PipelineCanvas
-            outputs={currentRun ? currentRun.agentOutputs : null}
-            logs={logs}
-            isProcessing={isProcessing}
-            currentAgentId={currentAgentId}
-            onTriggerRun={runPipeline}
-            onTriggerHumanGate={() => setViewMode('approval')}
-          />
+          <ProtectedRoute fallback={<AuthPage onSuccess={() => setViewMode('dashboard')} onBackToLanding={() => setViewMode('landing')} />}>
+            <PipelineCanvas
+              outputs={currentRun ? currentRun.agentOutputs : null}
+              logs={logs}
+              isProcessing={isProcessing}
+              currentAgentId={currentAgentId}
+              onTriggerRun={runPipeline}
+              onTriggerHumanGate={() => setViewMode('approval')}
+            />
+          </ProtectedRoute>
         )}
 
         {viewMode === 'results' && currentRun && (
-          <ResultsDashboard
-            run={currentRun}
-            onRunNewPipeline={() => setViewMode('dashboard')}
-          />
+          <ProtectedRoute fallback={<AuthPage onSuccess={() => setViewMode('dashboard')} onBackToLanding={() => setViewMode('landing')} />}>
+            <ResultsDashboard
+              run={currentRun}
+              onRunNewPipeline={() => setViewMode('dashboard')}
+              cadModel={cadModel}
+            />
+          </ProtectedRoute>
         )}
 
-        {/* SDG Impact Footer Panel - Hidden on landing/auth/dashboard screens for minimalism */}
+        {/* SDG Impact Footer Panel */}
         {(viewMode === 'pipeline' || viewMode === 'results') && (
           <SdgImpactFooter
             carbonSavedKg={currentRun ? currentRun.carbonSavedKg : 14.2}
@@ -305,5 +325,13 @@ export default function App() {
         onDeleteRun={handleDeleteRun}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   );
 }
