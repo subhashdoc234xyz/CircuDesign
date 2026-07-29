@@ -24,8 +24,8 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
   const agents = [
     {
       id: 'bom',
-      name: '1. BOM Deconstruction Agent',
-      role: 'Parses raw BOM, quantities, mass, joinery topology & baseline carbon footprint',
+      name: 'BOM Deconstruction',
+      role: 'Parses raw Bill of Materials structure and attributes.',
       icon: Layers,
       color: 'from-blue-500/20 to-cyan-500/20',
       borderColor: 'border-cyan-500/30',
@@ -34,8 +34,8 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
     },
     {
       id: 'material',
-      name: '2. Material Science Agent',
-      role: 'RAG search for non-toxic, bio-based & recycled material substitutions',
+      name: 'Material Science Research',
+      role: 'Identifies sustainable bio-based and recycled alternatives.',
       icon: Atom,
       color: 'from-emerald-500/20 to-teal-500/20',
       borderColor: 'border-emerald-500/30',
@@ -44,8 +44,8 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
     },
     {
       id: 'structural',
-      name: '3. Structural Integrity Agent',
-      role: 'Engineering yield stress & load safety factor calculation (Loops back if strength fails)',
+      name: 'Structural Integrity Verification',
+      role: 'Calculates yield stress safety margins.',
       icon: ShieldCheck,
       color: 'from-blue-600/20 to-indigo-500/20',
       borderColor: 'border-blue-500/30',
@@ -54,8 +54,8 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
     },
     {
       id: 'lifecycle',
-      name: '4. Circular Lifecycle Agent',
-      role: 'Disassembly ease scoring, recyclability %, and embodied carbon reduction (kg CO2e)',
+      name: 'Circular Lifecycle Evaluation',
+      role: 'Calculates recyclability and disassembly scores.',
       icon: RefreshCw,
       color: 'from-teal-500/20 to-emerald-600/20',
       borderColor: 'border-teal-500/30',
@@ -64,8 +64,8 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
     },
     {
       id: 'orchestrator',
-      name: '5. Orchestrator Agent',
-      role: 'Synthesizes all constraint quadrants, triggers Human-in-the-Loop gate if risky',
+      name: 'Orchestrator Synthesis',
+      role: 'Verifies constraint quadrants and triggers engineering approval.',
       icon: Cpu,
       color: 'from-amber-500/20 to-emerald-500/20',
       borderColor: 'border-amber-500/30',
@@ -84,11 +84,8 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
           </div>
           <div>
             <h3 className="font-display text-base font-bold text-white">
-              Sequential Multi-Agent Pipeline Canvas
+              Multi-Agent Optimization Pipeline
             </h3>
-            <p className="text-xs text-slate-400">
-              5 Specialist Agents • Propose → Verify → Satisfy Loop
-            </p>
           </div>
         </div>
 

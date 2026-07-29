@@ -221,11 +221,8 @@ ${outputs?.orchestrator?.executiveSummary || 'Redesign complete.'}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h3 className="font-display text-lg font-bold text-white">
-              Before vs. After BOM Substitution Table
+              BOM Substitution Table
             </h3>
-            <p className="text-xs text-slate-400">
-              Detailed part-by-part material, mass, cost & mechanical property breakdown
-            </p>
           </div>
 
           <div className="relative">

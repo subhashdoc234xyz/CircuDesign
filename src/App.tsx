@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { LandingHero } from './components/LandingHero';
+import { AuthPage } from './components/AuthPage';
+import { Dashboard } from './components/Dashboard';
 import { PipelineCanvas } from './components/PipelineCanvas';
 import { ResultsDashboard } from './components/ResultsDashboard';
 import { HumanInTheLoopModal } from './components/HumanInTheLoopModal';
@@ -10,13 +12,7 @@ import { SAMPLE_BOMS } from './data/sampleBoms';
 import { PipelineRun, AgentLog, UserAuth, BOMItem, FlaggedSwap } from './types';
 
 export default function App() {
-  const [user, setUser] = useState<UserAuth | null>({
-    uid: 'guest-session-123',
-    email: null,
-    displayName: 'Guest Engineer',
-    photoURL: null,
-    isGuest: true
-  });
+  const [user, setUser] = useState<UserAuth | null>(null);
 
   const [activeBom, setActiveBom] = useState<{ name: string; items: BOMItem[] }>({
     name: SAMPLE_BOMS[0].name,
@@ -28,7 +24,7 @@ export default function App() {
   const [logs, setLogs] = useState<AgentLog[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'landing' | 'pipeline' | 'results'>('landing');
+  const [viewMode, setViewMode] = useState<'landing' | 'auth' | 'dashboard' | 'pipeline' | 'results'>('landing');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [showHumanGate, setShowHumanGate] = useState(false);
 
@@ -58,6 +54,7 @@ export default function App() {
       photoURL: null,
       isGuest: false
     });
+    setViewMode('dashboard');
   };
 
   const handleContinueGuest = () => {
@@ -68,6 +65,7 @@ export default function App() {
       photoURL: null,
       isGuest: true
     });
+    setViewMode('dashboard');
   };
 
   const handleSelectSampleBOM = (bom: typeof SAMPLE_BOMS[0]) => {
@@ -179,6 +177,12 @@ export default function App() {
     }
   };
 
+  const handleSignOut = () => {
+    setUser(null);
+    setViewMode('landing');
+    setCurrentRun(null);
+  };
+
   return (
     <div className="min-h-screen flex flex-col justify-between bg-[#0B1220] text-slate-100">
       {/* Top Navbar */}
@@ -186,9 +190,14 @@ export default function App() {
         user={user}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onReset={() => {
-          setViewMode('landing');
+          if (user) {
+            setViewMode('dashboard');
+          } else {
+            setViewMode('landing');
+          }
           setCurrentRun(null);
         }}
+        onSignOut={handleSignOut}
         activeRunTitle={activeBom.name}
         isProcessing={isProcessing}
       />
@@ -196,12 +205,21 @@ export default function App() {
       {/* Main Content Area */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 w-full flex-1">
         {viewMode === 'landing' && (
-          <LandingHero
-            onSelectSampleBOM={handleSelectSampleBOM}
-            onCustomFileUpload={handleCustomFileUpload}
+          <LandingHero onGetStarted={() => setViewMode('auth')} />
+        )}
+
+        {viewMode === 'auth' && (
+          <AuthPage
             onContinueGoogle={handleContinueGoogle}
             onContinueGuest={handleContinueGuest}
-            userSignedIn={Boolean(user && !user.isGuest)}
+            onBackToLanding={() => setViewMode('landing')}
+          />
+        )}
+
+        {viewMode === 'dashboard' && (
+          <Dashboard
+            onSelectSampleBOM={handleSelectSampleBOM}
+            onCustomFileUpload={handleCustomFileUpload}
           />
         )}
 
@@ -219,17 +237,19 @@ export default function App() {
         {viewMode === 'results' && currentRun && (
           <ResultsDashboard
             run={currentRun}
-            onRunNewPipeline={() => setViewMode('landing')}
+            onRunNewPipeline={() => setViewMode('dashboard')}
           />
         )}
 
-        {/* SDG Impact Footer Panel */}
-        <SdgImpactFooter
-          carbonSavedKg={currentRun ? currentRun.carbonSavedKg : 14.2}
-          carbonSavedPercent={currentRun ? currentRun.carbonSavedPercent : 38}
-          recyclabilityPercent={currentRun ? currentRun.recyclabilityScore : 88}
-          disassemblyScore={currentRun ? currentRun.disassemblyScore : 85}
-        />
+        {/* SDG Impact Footer Panel - Hidden on landing/auth/dashboard screens for minimalism */}
+        {(viewMode === 'pipeline' || viewMode === 'results') && (
+          <SdgImpactFooter
+            carbonSavedKg={currentRun ? currentRun.carbonSavedKg : 14.2}
+            carbonSavedPercent={currentRun ? currentRun.carbonSavedPercent : 38}
+            recyclabilityPercent={currentRun ? currentRun.recyclabilityScore : 88}
+            disassemblyScore={currentRun ? currentRun.disassemblyScore : 85}
+          />
+        )}
       </main>
 
       {/* Human-in-the-Loop Safety Modal */}
