@@ -11,6 +11,8 @@ import { HistoryDrawer } from './components/HistoryDrawer';
 import { SdgImpactFooter } from './components/SdgImpactFooter';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { db } from './lib/firebase';
 import { SAMPLE_BOMS } from './data/sampleBoms';
 import { PipelineRun, AgentLog, BOMItem, ParsedCADModel } from './types';
 
@@ -39,21 +41,30 @@ function MainApp() {
     }
   }, [currentUser]);
 
-  // Load user history on mount or auth change
+  // Load user history from Firestore (or fallback to backend API) on auth change
   useEffect(() => {
     fetchHistory();
   }, [currentUser]);
 
   const fetchHistory = async () => {
     try {
-      const uid = currentUser ? currentUser.uid : 'guest-session';
-      const res = await fetch(`/api/runs?userUid=${uid}`);
-      const data = await res.json();
-      if (data && data.runs) {
-        setRuns(data.runs);
+      if (currentUser && !currentUser.isAnonymous) {
+        // Query user's private Firestore subcollection: users/{uid}/runs
+        const runsRef = collection(db, 'users', currentUser.uid, 'runs');
+        const q = query(runsRef, orderBy('timestamp', 'desc'));
+        const snapshot = await getDocs(q);
+        const userRuns: PipelineRun[] = snapshot.docs.map(doc => doc.data() as PipelineRun);
+        setRuns(userRuns);
+      } else {
+        const uid = currentUser ? currentUser.uid : 'guest-session';
+        const res = await fetch(`/api/runs?userUid=${uid}`);
+        const data = await res.json();
+        if (data && data.runs) {
+          setRuns(data.runs);
+        }
       }
     } catch (err) {
-      console.warn('Could not fetch run history:', err);
+      console.warn('Could not fetch run history from Firestore/API:', err);
     }
   };
 
@@ -137,7 +148,18 @@ function MainApp() {
 
       const data = await response.json();
       if (data && data.success && data.run) {
-        setCurrentRun(data.run);
+        const runRecord: PipelineRun = data.run;
+        setCurrentRun(runRecord);
+
+        // Save run directly to user's private Firestore subcollection: users/{uid}/runs/{runId}
+        if (currentUser && !currentUser.isAnonymous) {
+          try {
+            await setDoc(doc(db, 'users', currentUser.uid, 'runs', runRecord.id), runRecord);
+          } catch (fsErr) {
+            console.warn('Could not persist run to Firestore:', fsErr);
+          }
+        }
+
         fetchHistory();
 
         addLog('orchestrator', '5. Orchestrator Agent', 'Pipeline run complete. All constraints analyzed.');
@@ -177,8 +199,12 @@ function MainApp() {
 
   const handleDeleteRun = async (id: string) => {
     try {
-      const uid = currentUser ? currentUser.uid : 'guest-session';
-      await fetch(`/api/runs/${id}?userUid=${uid}`, { method: 'DELETE' });
+      if (currentUser && !currentUser.isAnonymous) {
+        await deleteDoc(doc(db, 'users', currentUser.uid, 'runs', id));
+      } else {
+        const uid = currentUser ? currentUser.uid : 'guest-session';
+        await fetch(`/api/runs/${id}?userUid=${uid}`, { method: 'DELETE' });
+      }
       fetchHistory();
     } catch (err) {
       console.warn('Could not delete run:', err);
