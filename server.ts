@@ -43,7 +43,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`CircuDesign Server running on http://0.0.0.0:${PORT}`);
+    console.log(`CircuDesign Server running on http://localhost:${PORT}`);
   });
 }
 
