@@ -29,6 +29,8 @@ export interface MaterialAlternative {
   source?: 'curated' | 'csv' | 'kaggle' | 'web';
   confidence?: number;
   verifiedByStructural?: boolean;
+  advantages?: string[];
+  tradeoffs?: string[];
 }
 
 export interface FlaggedSwap {

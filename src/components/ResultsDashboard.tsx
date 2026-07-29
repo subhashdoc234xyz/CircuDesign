@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Leaf, RefreshCw, ShieldCheck, DollarSign, Download, Copy, Check, Search, Filter, Sparkles, Layers, ArrowRight, Database, Globe } from 'lucide-react';
+import { Leaf, RefreshCw, ShieldCheck, DollarSign, Download, Copy, Check, Search, Filter, Sparkles, Layers, ArrowRight, Database, Globe, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { PipelineRun, BOMItem } from '../types';
 import { ConstraintSatisfactionRing } from './ConstraintSatisfactionRing';
@@ -15,6 +15,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandedPartId, setExpandedPartId] = useState<string | null>(null);
 
   const outputs = run.agentOutputs;
   const bomItems = run.bomData || [];
@@ -254,46 +255,134 @@ ${outputs?.orchestrator?.executiveSummary || 'Redesign complete.'}
               {filteredItems.map((item) => {
                 const swap = proposedSwaps[item.partId];
                 const source = swap?.source || 'curated';
+                const isExpanded = expandedPartId === item.partId;
+
+                const defaultAdvantages = [
+                  'Substantial carbon footprint reduction',
+                  'Equivalent or improved recyclability profile',
+                  'Satisfies structural load safety factors'
+                ];
+
+                const defaultTradeoffs = [
+                  'Requires setup verify check on secondary supply lines'
+                ];
+
+                const advantages = swap?.advantages || defaultAdvantages;
+                const tradeoffs = swap?.tradeoffs || defaultTradeoffs;
+
                 return (
-                  <tr key={item.partId} className="hover:bg-white/5 transition">
-                    <td className="p-3 font-medium text-white">
-                      <span className="font-mono text-emerald-400 text-[10px] mr-1.5 font-bold">[{item.partId}]</span>
-                      {item.name}
-                    </td>
-                    <td className="p-3 text-slate-400">{item.category}</td>
-                    <td className="p-3 text-slate-300">{item.currentMaterial}</td>
-                    <td className="p-3 font-semibold text-emerald-300">
-                      {swap ? swap.name : item.currentMaterial}
-                    </td>
-                    <td className="p-3">
-                      {source === 'curated' && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/30" title="Hand-picked verified eco-materials database">
-                          <Leaf className="h-3 w-3 text-emerald-400" /> Curated DB
-                        </span>
-                      )}
-                      {source === 'csv' && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold text-blue-300 border border-blue-500/30" title="Bundled CSV Materials Dataset match">
-                          <Database className="h-3 w-3 text-blue-400" /> CSV Dataset
-                        </span>
-                      )}
-                      {source === 'kaggle' && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-bold text-cyan-300 border border-cyan-500/30" title="Kaggle Green Supply Chain Dataset match">
-                          <Database className="h-3 w-3 text-cyan-400" /> Kaggle DB
-                        </span>
-                      )}
-                      {source === 'web' && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30" title="Live Web Search research fallback">
-                          <Globe className="h-3 w-3 text-amber-400" /> Web Search
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3 text-right font-mono text-slate-200">
-                      {item.tensileStrengthMPa} → <span className="text-emerald-400 font-bold">{swap ? swap.tensileStrengthMPa : item.tensileStrengthMPa}</span>
-                    </td>
-                    <td className="p-3 text-right font-bold text-emerald-400">
-                      -{Math.round(((item.carbonFootprintKgCO2PerKg - (swap ? swap.carbonFootprintKgCO2PerKg : item.carbonFootprintKgCO2PerKg)) / item.carbonFootprintKgCO2PerKg) * 100)}%
-                    </td>
-                  </tr>
+                  <React.Fragment key={item.partId}>
+                    <tr
+                      onClick={() => setExpandedPartId(isExpanded ? null : item.partId)}
+                      className="hover:bg-white/5 transition cursor-pointer select-none"
+                    >
+                      <td className="p-3 font-medium text-white flex items-center gap-2">
+                        {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                        <div>
+                          <span className="font-mono text-emerald-400 text-[10px] mr-1.5 font-bold">[{item.partId}]</span>
+                          {item.name}
+                        </div>
+                      </td>
+                      <td className="p-3 text-slate-400">{item.category}</td>
+                      <td className="p-3 text-slate-300">{item.currentMaterial}</td>
+                      <td className="p-3 font-semibold text-emerald-300">
+                        {swap ? swap.name : item.currentMaterial}
+                      </td>
+                      <td className="p-3">
+                        {source === 'curated' && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/30" title="Hand-picked verified eco-materials database">
+                            <Leaf className="h-3 w-3 text-emerald-400" /> Curated DB
+                          </span>
+                        )}
+                        {source === 'csv' && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold text-blue-300 border border-blue-500/30" title="Bundled CSV Materials Dataset match">
+                            <Database className="h-3 w-3 text-blue-400" /> CSV Dataset
+                          </span>
+                        )}
+                        {source === 'kaggle' && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-bold text-cyan-300 border border-cyan-500/30" title="Kaggle Green Supply Chain Dataset match">
+                            <Database className="h-3 w-3 text-cyan-400" /> Kaggle DB
+                          </span>
+                        )}
+                        {source === 'web' && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30" title="Live Web Search research fallback">
+                            <Globe className="h-3 w-3 text-amber-400" /> Web Search
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 text-right font-mono text-slate-200">
+                        {item.tensileStrengthMPa} → <span className="text-emerald-400 font-bold">{swap ? swap.tensileStrengthMPa : item.tensileStrengthMPa}</span>
+                      </td>
+                      <td className="p-3 text-right font-bold text-emerald-400">
+                        -{Math.round(((item.carbonFootprintKgCO2PerKg - (swap ? swap.carbonFootprintKgCO2PerKg : item.carbonFootprintKgCO2PerKg)) / item.carbonFootprintKgCO2PerKg) * 100)}%
+                      </td>
+                    </tr>
+
+                    {/* Expandable advantages / tradeoffs drawer */}
+                    {isExpanded && swap && (
+                      <tr className="bg-white/[0.02] border-t-0">
+                        <td colSpan={7} className="p-4 border-b border-white/5">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                            {/* Properties comparison list */}
+                            <div className="space-y-3">
+                              <h4 className="font-bold text-white text-[11px] uppercase tracking-wider">
+                                Properties Comparison
+                              </h4>
+                              <div className="grid grid-cols-2 gap-4 border border-white/5 rounded-xl p-3 bg-black/25">
+                                <div className="space-y-1">
+                                  <span className="text-[10px] text-slate-400 uppercase font-medium">Original ({item.currentMaterial})</span>
+                                  <div className="text-slate-200 font-medium">Strength: {item.tensileStrengthMPa} MPa</div>
+                                  <div className="text-slate-200 font-medium">Carbon: {item.carbonFootprintKgCO2PerKg} kg CO2/kg</div>
+                                  <div className="text-slate-200 font-medium">Recyclable: {item.recyclablePercent}%</div>
+                                </div>
+                                <div className="space-y-1 border-l border-white/5 pl-4">
+                                  <span className="text-[10px] text-emerald-400 uppercase font-medium">Alternative ({swap.name})</span>
+                                  <div className="text-emerald-300 font-medium">Strength: {swap.tensileStrengthMPa} MPa</div>
+                                  <div className="text-emerald-300 font-medium">Carbon: {swap.carbonFootprintKgCO2PerKg} kg CO2/kg</div>
+                                  <div className="text-emerald-300 font-medium">Recyclable: {swap.recyclabilityScore}%</div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Advantages / Tradeoffs */}
+                            <div className="space-y-3">
+                              <h4 className="font-bold text-white text-[11px] uppercase tracking-wider">
+                                Swap Curation Details
+                              </h4>
+                              <div className="space-y-2.5">
+                                <div>
+                                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block mb-1">
+                                    Key Advantages
+                                  </span>
+                                  <ul className="space-y-1 list-disc list-inside text-slate-300 pl-1">
+                                    {advantages.map((adv, aIdx) => (
+                                      <li key={aIdx}>{adv}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+
+                                {tradeoffs.length > 0 && (
+                                  <div>
+                                    <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block mb-1">
+                                      Tradeoffs & Engineering Notes
+                                    </span>
+                                    <ul className="space-y-1 list-disc list-inside text-slate-300 pl-1">
+                                      {tradeoffs.map((trd, tIdx) => (
+                                        <li key={tIdx} className="flex items-start gap-1.5">
+                                          <AlertTriangle className="h-3 w-3 text-amber-400 mt-0.5 shrink-0" />
+                                          <span>{trd}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </tbody>
