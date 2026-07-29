@@ -23,8 +23,8 @@ export async function runOrchestratorAgent(
       ? Math.round(((itemBaselineCarbon - itemNewCarbon) / itemBaselineCarbon) * 100)
       : 0;
 
-    // Flag swaps if tensile strength drops by >15% OR if cost increases by >8% OR if bio-content is low
-    if (tensileDelta < -15 || costDelta > 8) {
+    // Flag swaps if tensile strength drops by >12% OR if cost increases by >=5%
+    if (tensileDelta < -12 || costDelta >= 5) {
       flaggedSwaps.push({
         partId: item.partId,
         partName: item.name,

@@ -97,7 +97,7 @@ export function findMaterialAlternative(
         carbonFootprintKgCO2PerKg: 2.2,
         recyclabilityScore: 78,
         tensileStrengthMPa: 68,
-        costMultiplier: 1.05,
+        costMultiplier: 1.09,
         biobasedContentPercent: 45,
         toxicityIndex: 'Low (Non-Toxic)',
         supplyAvailabilityIndex: 'High',
@@ -123,7 +123,7 @@ export function findMaterialAlternative(
         carbonFootprintKgCO2PerKg: 3.2,
         recyclabilityScore: 85,
         tensileStrengthMPa: 85,
-        costMultiplier: 1.08,
+        costMultiplier: 1.12,
         biobasedContentPercent: 100,
         toxicityIndex: 'Low (Non-Toxic)',
         supplyAvailabilityIndex: 'High',
@@ -136,7 +136,7 @@ export function findMaterialAlternative(
           'Low moisture absorption'
         ],
         tradeoffs: [
-          '8% premium over standard PA66'
+          '12% premium over standard PA66 — requires engineer approval'
         ]
       }
     ];
