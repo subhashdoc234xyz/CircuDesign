@@ -9,11 +9,13 @@ import { ResultsDashboard } from './components/ResultsDashboard';
 import { HumanInTheLoopModal } from './components/HumanInTheLoopModal';
 import { HistoryDrawer } from './components/HistoryDrawer';
 import { SdgImpactFooter } from './components/SdgImpactFooter';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { SAMPLE_BOMS } from './data/sampleBoms';
-import { PipelineRun, AgentLog, UserAuth, BOMItem, FlaggedSwap, ParsedCADModel } from './types';
+import { PipelineRun, AgentLog, BOMItem, ParsedCADModel } from './types';
 
-export default function App() {
-  const [user, setUser] = useState<UserAuth | null>(null);
+function MainApp() {
+  const { currentUser, logout } = useAuth();
 
   const [activeBom, setActiveBom] = useState<{ name: string; items: BOMItem[] }>({
     name: SAMPLE_BOMS[0].name,
@@ -30,14 +32,21 @@ export default function App() {
   const [showHumanGate, setShowHumanGate] = useState(false);
   const [cadModel, setCadModel] = useState<ParsedCADModel | null>(null);
 
-  // Load user history on mount
+  // Auto-switch to dashboard on auth change if on auth page
+  useEffect(() => {
+    if (currentUser && viewMode === 'auth') {
+      setViewMode('dashboard');
+    }
+  }, [currentUser]);
+
+  // Load user history on mount or auth change
   useEffect(() => {
     fetchHistory();
-  }, [user]);
+  }, [currentUser]);
 
   const fetchHistory = async () => {
     try {
-      const uid = user ? user.uid : 'guest-session';
+      const uid = currentUser ? currentUser.uid : 'guest-session';
       const res = await fetch(`/api/runs?userUid=${uid}`);
       const data = await res.json();
       if (data && data.runs) {
@@ -46,28 +55,6 @@ export default function App() {
     } catch (err) {
       console.warn('Could not fetch run history:', err);
     }
-  };
-
-  const handleContinueGoogle = () => {
-    setUser({
-      uid: `google-user-${Date.now()}`,
-      email: 'engineer@circudesign.ai',
-      displayName: 'Alex Rivers (Lead Engineer)',
-      photoURL: null,
-      isGuest: false
-    });
-    setViewMode('dashboard');
-  };
-
-  const handleContinueGuest = () => {
-    setUser({
-      uid: `guest-session-${Date.now()}`,
-      email: null,
-      displayName: 'Guest Engineer',
-      photoURL: null,
-      isGuest: true
-    });
-    setViewMode('dashboard');
   };
 
   const handleSelectSampleBOM = (bom: typeof SAMPLE_BOMS[0]) => {
@@ -144,7 +131,7 @@ export default function App() {
         body: JSON.stringify({
           items: activeBom.items,
           bomName: activeBom.name,
-          userUid: user?.uid || 'guest-session'
+          userUid: currentUser?.uid || 'guest-session'
         })
       });
 
@@ -190,7 +177,7 @@ export default function App() {
 
   const handleDeleteRun = async (id: string) => {
     try {
-      const uid = user ? user.uid : 'guest-session';
+      const uid = currentUser ? currentUser.uid : 'guest-session';
       await fetch(`/api/runs/${id}?userUid=${uid}`, { method: 'DELETE' });
       fetchHistory();
     } catch (err) {
@@ -198,21 +185,13 @@ export default function App() {
     }
   };
 
-  const handleSignOut = () => {
-    setUser(null);
-    setViewMode('landing');
-    setCurrentRun(null);
-    setCadModel(null);
-  };
-
   return (
     <div className="min-h-screen flex flex-col justify-between bg-[#0B1220] text-slate-100">
       {/* Top Navbar */}
       <Navbar
-        user={user}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onReset={() => {
-          if (user) {
+          if (currentUser) {
             setViewMode('dashboard');
           } else {
             setViewMode('landing');
@@ -220,7 +199,6 @@ export default function App() {
           setCurrentRun(null);
           setCadModel(null);
         }}
-        onSignOut={handleSignOut}
         activeRunTitle={activeBom.name}
         isProcessing={isProcessing}
       />
@@ -228,54 +206,61 @@ export default function App() {
       {/* Main Content Area */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 w-full flex-1">
         {viewMode === 'landing' && (
-          <LandingHero onGetStarted={() => setViewMode('auth')} />
+          <LandingHero onGetStarted={() => setViewMode(currentUser ? 'dashboard' : 'auth')} />
         )}
 
         {viewMode === 'auth' && (
           <AuthPage
-            onContinueGoogle={handleContinueGoogle}
-            onContinueGuest={handleContinueGuest}
+            onSuccess={() => setViewMode('dashboard')}
             onBackToLanding={() => setViewMode('landing')}
           />
         )}
 
         {viewMode === 'dashboard' && (
-          <Dashboard
-            onSelectSampleBOM={handleSelectSampleBOM}
-            onCustomFileUpload={handleCustomFileUpload}
-            onCADModelLoaded={handleCADModelLoaded}
-          />
+          <ProtectedRoute fallback={<AuthPage onSuccess={() => setViewMode('dashboard')} onBackToLanding={() => setViewMode('landing')} />}>
+            <Dashboard
+              onSelectSampleBOM={handleSelectSampleBOM}
+              onCustomFileUpload={handleCustomFileUpload}
+              onCADModelLoaded={handleCADModelLoaded}
+            />
+          </ProtectedRoute>
         )}
 
         {viewMode === 'approval' && currentRun && (
-          <ApprovalPage
-            flaggedSwaps={currentRun.agentOutputs?.orchestrator?.flaggedSwaps || []}
-            onApproveAll={handleApproveAllSwaps}
-            onRejectAll={handleRejectAllSwaps}
-            runTitle={activeBom.name}
-          />
+          <ProtectedRoute fallback={<AuthPage onSuccess={() => setViewMode('dashboard')} onBackToLanding={() => setViewMode('landing')} />}>
+            <ApprovalPage
+              flaggedSwaps={currentRun.agentOutputs?.orchestrator?.flaggedSwaps || []}
+              onApproveAll={handleApproveAllSwaps}
+              onRejectAll={handleRejectAllSwaps}
+              runTitle={activeBom.name}
+            />
+          </ProtectedRoute>
         )}
 
         {viewMode === 'pipeline' && (
-          <PipelineCanvas
-            outputs={currentRun ? currentRun.agentOutputs : null}
-            logs={logs}
-            isProcessing={isProcessing}
-            currentAgentId={currentAgentId}
-            onTriggerRun={runPipeline}
-            onTriggerHumanGate={() => setViewMode('approval')}
-          />
+          <ProtectedRoute fallback={<AuthPage onSuccess={() => setViewMode('dashboard')} onBackToLanding={() => setViewMode('landing')} />}>
+            <PipelineCanvas
+              outputs={currentRun ? currentRun.agentOutputs : null}
+              logs={logs}
+              isProcessing={isProcessing}
+              currentAgentId={currentAgentId}
+              onTriggerRun={runPipeline}
+              onTriggerHumanGate={() => setViewMode('approval')}
+            />
+          </ProtectedRoute>
         )}
 
         {viewMode === 'results' && currentRun && (
-          <ResultsDashboard
-            run={currentRun}
-            onRunNewPipeline={() => setViewMode('dashboard')}
-            cadModel={cadModel}
-          />
+          <ProtectedRoute fallback={<AuthPage onSuccess={() => setViewMode('dashboard')} onBackToLanding={() => setViewMode('landing')} />}>
+            <ResultsDashboard
+              run={currentRun}
+              onRunNewPipeline={() => setViewMode('dashboard')}
+              cadModel={cadModel}
+            />
+          </ProtectedRoute>
         )}
 
-        {/* SDG Impact Footer Panel - Hidden on landing/auth/dashboard screens for minimalism */}
+        {/* SDG Impact Footer Panel */}
         {(viewMode === 'pipeline' || viewMode === 'results') && (
           <SdgImpactFooter
             carbonSavedKg={currentRun ? currentRun.carbonSavedKg : 14.2}
@@ -312,5 +297,13 @@ export default function App() {
         onDeleteRun={handleDeleteRun}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   );
 }

@@ -6,7 +6,7 @@ import { runStructuralIntegrityAgent } from '../agents/structuralAgent';
 import { runCircularLifecycleAgent } from '../agents/lifecycleAgent';
 import { runOrchestratorAgent } from '../agents/orchestratorAgent';
 import { SAMPLE_BOMS } from '../../data/sampleBoms';
-import { PipelineRun } from '../../types';
+import { PipelineRun, BOMItem } from '../../types';
 
 export const apiRouter = Router();
 
