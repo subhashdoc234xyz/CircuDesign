@@ -10,7 +10,7 @@ import { HumanInTheLoopModal } from './components/HumanInTheLoopModal';
 import { HistoryDrawer } from './components/HistoryDrawer';
 import { SdgImpactFooter } from './components/SdgImpactFooter';
 import { SAMPLE_BOMS } from './data/sampleBoms';
-import { PipelineRun, AgentLog, UserAuth, BOMItem, FlaggedSwap } from './types';
+import { PipelineRun, AgentLog, UserAuth, BOMItem, FlaggedSwap, ParsedCADModel } from './types';
 
 export default function App() {
   const [user, setUser] = useState<UserAuth | null>(null);
@@ -28,6 +28,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'landing' | 'auth' | 'dashboard' | 'pipeline' | 'results' | 'approval'>('landing');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [showHumanGate, setShowHumanGate] = useState(false);
+  const [cadModel, setCadModel] = useState<ParsedCADModel | null>(null);
 
   // Load user history on mount
   useEffect(() => {
@@ -77,6 +78,10 @@ export default function App() {
   const handleCustomFileUpload = (items: BOMItem[], fileName: string) => {
     setActiveBom({ name: fileName, items });
     setViewMode('pipeline');
+  };
+
+  const handleCADModelLoaded = (model: ParsedCADModel) => {
+    setCadModel(model);
   };
 
   const addLog = (agentId: 'bom' | 'material' | 'structural' | 'lifecycle' | 'orchestrator', agentName: string, message: string, details?: string) => {
@@ -197,6 +202,7 @@ export default function App() {
     setUser(null);
     setViewMode('landing');
     setCurrentRun(null);
+    setCadModel(null);
   };
 
   return (
@@ -212,6 +218,7 @@ export default function App() {
             setViewMode('landing');
           }
           setCurrentRun(null);
+          setCadModel(null);
         }}
         onSignOut={handleSignOut}
         activeRunTitle={activeBom.name}
@@ -236,6 +243,7 @@ export default function App() {
           <Dashboard
             onSelectSampleBOM={handleSelectSampleBOM}
             onCustomFileUpload={handleCustomFileUpload}
+            onCADModelLoaded={handleCADModelLoaded}
           />
         )}
 
@@ -263,6 +271,7 @@ export default function App() {
           <ResultsDashboard
             run={currentRun}
             onRunNewPipeline={() => setViewMode('dashboard')}
+            cadModel={cadModel}
           />
         )}
 

@@ -134,3 +134,17 @@ export interface UserAuth {
   photoURL: string | null;
   isGuest: boolean;
 }
+
+// ── CAD Integration Types ──
+
+export interface CADPart {
+  name: string;
+  meshIndices: number[];
+  estimatedVolumeCm3: number;
+}
+
+export interface ParsedCADModel {
+  meshes: any[];   // raw occt-import-js mesh data (positions, normals, indices)
+  root: any;       // part tree from occt-import-js
+  parts: CADPart[];
+}

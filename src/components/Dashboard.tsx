@@ -1,20 +1,27 @@
 import React, { useState } from 'react';
-import { Upload, FileSpreadsheet, Layers, ArrowRight, Sparkles, RefreshCw } from 'lucide-react';
+import { Upload, FileSpreadsheet, Layers, ArrowRight, Sparkles, RefreshCw, Box } from 'lucide-react';
 import { SAMPLE_BOMS } from '../data/sampleBoms';
-import { BOMItem } from '../types';
+import { BOMItem, ParsedCADModel } from '../types';
+import { parseStepBuffer } from '../cad/stepParser';
+import { cadPartsToBomItems } from '../cad/cadToBom';
 
 interface DashboardProps {
   onSelectSampleBOM: (bom: typeof SAMPLE_BOMS[0]) => void;
   onCustomFileUpload: (items: BOMItem[], fileName: string) => void;
+  onCADModelLoaded?: (model: ParsedCADModel) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
   onSelectSampleBOM,
-  onCustomFileUpload
+  onCustomFileUpload,
+  onCADModelLoaded
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [description, setDescription] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [uploadTab, setUploadTab] = useState<'csv' | 'cad'>('csv');
+  const [isParsingCAD, setIsParsingCAD] = useState(false);
+  const [cadError, setCadError] = useState<string | null>(null);
 
   const handleFileUpload = (file: File) => {
     const reader = new FileReader();
@@ -113,6 +120,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
     reader.readAsText(file);
   };
 
+  const handleCADFileUpload = async (file: File) => {
+    setIsParsingCAD(true);
+    setCadError(null);
+    try {
+      const buffer = await file.arrayBuffer();
+      const model = await parseStepBuffer(buffer);
+      const bomItems = cadPartsToBomItems(model.parts);
+
+      if (onCADModelLoaded) {
+        onCADModelLoaded(model);
+      }
+
+      if (bomItems.length > 0) {
+        onCustomFileUpload(bomItems, file.name);
+      } else {
+        setCadError('No parts found in CAD file.');
+      }
+    } catch (err) {
+      console.error('CAD parse error:', err);
+      setCadError(err instanceof Error ? err.message : 'Failed to parse CAD file.');
+    } finally {
+      setIsParsingCAD(false);
+    }
+  };
+
   const handleGenerateBOM = async () => {
     if (!description.trim()) return;
     setIsGenerating(true);
@@ -180,7 +212,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* Upload Card */}
+        {/* Upload Card — CSV/JSON + CAD tabs */}
         <div className="glass-panel rounded-3xl p-6 border border-white/10 flex flex-col justify-between space-y-4">
           <div className="space-y-3 flex-1 flex flex-col justify-between">
             <div>
@@ -190,47 +222,137 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   Upload Custom BOM
                 </h3>
               </div>
-              <div className="mt-2 text-[10px] text-slate-400 font-semibold">
-                * CAD Ingestion (STEP/IGES) currently scoped out. CSV/JSON active.
+
+              {/* Tab selector */}
+              <div className="mt-2 flex rounded-lg bg-black/30 border border-white/10 p-0.5">
+                <button
+                  onClick={() => setUploadTab('csv')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[10px] font-bold transition ${
+                    uploadTab === 'csv'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'text-slate-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <FileSpreadsheet className="h-3 w-3" />
+                  CSV / JSON
+                </button>
+                <button
+                  onClick={() => setUploadTab('cad')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[10px] font-bold transition ${
+                    uploadTab === 'cad'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                      : 'text-slate-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <Box className="h-3 w-3" />
+                  CAD (STEP/STP)
+                </button>
               </div>
             </div>
 
-            <div
-              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragActive(false);
-                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                  handleFileUpload(e.dataTransfer.files[0]);
-                }
-              }}
-              className={`border border-dashed rounded-xl p-6 text-center transition flex-1 flex flex-col items-center justify-center min-h-[140px] ${
-                dragActive ? 'border-emerald-400 bg-emerald-500/10' : 'border-white/15 bg-black/20'
-              }`}
-            >
-              <FileSpreadsheet className="h-8 w-8 text-emerald-400 mb-1.5 opacity-80" />
-              <span className="block text-[11px] font-semibold text-slate-200">
-                Drag & Drop file
-              </span>
-              <span className="block text-[9px] text-slate-500">
-                Supports .csv / .json
-              </span>
+            {/* CSV/JSON tab */}
+            {uploadTab === 'csv' && (
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragActive(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleFileUpload(e.dataTransfer.files[0]);
+                  }
+                }}
+                className={`border border-dashed rounded-xl p-6 text-center transition flex-1 flex flex-col items-center justify-center min-h-[140px] ${
+                  dragActive ? 'border-emerald-400 bg-emerald-500/10' : 'border-white/15 bg-black/20'
+                }`}
+              >
+                <FileSpreadsheet className="h-8 w-8 text-emerald-400 mb-1.5 opacity-80" />
+                <span className="block text-[11px] font-semibold text-slate-200">
+                  Drag & Drop file
+                </span>
+                <span className="block text-[9px] text-slate-500">
+                  Supports .csv / .json
+                </span>
 
-              <label className="mt-3 inline-block cursor-pointer rounded-lg bg-white/5 px-3 py-1.5 text-[10px] font-semibold text-white hover:bg-white/10 border border-white/15">
-                Browse
-                <input
-                  type="file"
-                  accept=".csv,.json"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      handleFileUpload(e.target.files[0]);
-                    }
-                  }}
-                />
-              </label>
-            </div>
+                <label className="mt-3 inline-block cursor-pointer rounded-lg bg-white/5 px-3 py-1.5 text-[10px] font-semibold text-white hover:bg-white/10 border border-white/15">
+                  Browse
+                  <input
+                    type="file"
+                    accept=".csv,.json"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleFileUpload(e.target.files[0]);
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+            )}
+
+            {/* CAD (STEP/STP) tab */}
+            {uploadTab === 'cad' && (
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragActive(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleCADFileUpload(e.dataTransfer.files[0]);
+                  }
+                }}
+                className={`border border-dashed rounded-xl p-6 text-center transition flex-1 flex flex-col items-center justify-center min-h-[140px] ${
+                  isParsingCAD
+                    ? 'border-cyan-400 bg-cyan-500/10'
+                    : dragActive
+                      ? 'border-cyan-400 bg-cyan-500/10'
+                      : 'border-white/15 bg-black/20'
+                }`}
+              >
+                {isParsingCAD ? (
+                  <>
+                    <RefreshCw className="h-8 w-8 text-cyan-400 mb-1.5 animate-spin" />
+                    <span className="block text-[11px] font-semibold text-cyan-300">
+                      Parsing STEP geometry...
+                    </span>
+                    <span className="block text-[9px] text-slate-400 mt-1">
+                      Loading WASM + extracting part tree
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Box className="h-8 w-8 text-cyan-400 mb-1.5 opacity-80" />
+                    <span className="block text-[11px] font-semibold text-slate-200">
+                      Drag & Drop CAD file
+                    </span>
+                    <span className="block text-[9px] text-slate-500">
+                      Supports .step / .stp
+                    </span>
+
+                    {cadError && (
+                      <span className="block text-[10px] text-red-400 mt-1 font-medium">
+                        {cadError}
+                      </span>
+                    )}
+
+                    <label className="mt-3 inline-block cursor-pointer rounded-lg bg-white/5 px-3 py-1.5 text-[10px] font-semibold text-white hover:bg-white/10 border border-white/15">
+                      Browse
+                      <input
+                        type="file"
+                        accept=".step,.stp"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleCADFileUpload(e.target.files[0]);
+                          }
+                        }}
+                      />
+                    </label>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
