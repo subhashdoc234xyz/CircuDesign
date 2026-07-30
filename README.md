@@ -10,7 +10,7 @@
 [![Gemini AI](https://img.shields.io/badge/Google_Gemini-2.5_%2F_3.0-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)](https://ai.google.dev/)
 [![Three.js](https://img.shields.io/badge/Three.js-0.185-000000?style=for-the-badge&logo=three.js&logoColor=white)](https://threejs.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.1-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![License](https://img.shields.io/badge/License-MIT-green.style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](./LICENSE)
 
 <br />
 
@@ -175,7 +175,7 @@ CircuDesign/
 
 ## 📄 License
 
-Distributed under the **MIT License**. See `LICENSE` for more details.
+Distributed under the **MIT License**. See [LICENSE](./LICENSE) for more details.
 
 ---
 
